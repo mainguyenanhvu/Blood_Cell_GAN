@@ -13,8 +13,8 @@ class Dataset():
 
         self.ndim = 0
         
-        self.img_width = 150
-        self.img_height =  150
+        self.img_width = 256
+        self.img_height =  256
         self.channels = 3
         self.classnum = 4
         self.shape = (self.img_width,self.img_height,self.channels)

@@ -17,13 +17,14 @@ ACCEPTABLE_AVAILABLE_MEMORY = 1024
 OPTIMIZER="Adam"
 LOSS="categorical_crossentropy"
 METRICS=["accuracy"]
-EPOCHS = 100
+EPOCHS = 200
 
-def train_naive_GAN(gan, discriminator, dataset):
+def train_naive_GAN(gan, generator, discriminator, dataset):
     discriminator.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
     discriminator.trainable = False
     gan.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
     
+    output_path = '/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/output/vanilla_GAN'
     generator, discriminator = gan.layers
     history = {'epoch':[], 'disc_loss_epoch':[], 'gan_loss_epoch':[]}
     n_batch = dataset.train_generator.samples//dataset.batch_size
@@ -54,6 +55,56 @@ def train_naive_GAN(gan, discriminator, dataset):
         #history['epoch'].append(epoch+1)
         history['disc_loss_epoch'].append(disc_loss['loss'])
         history['gan_loss_epoch'].append(gan_loss['loss'])
+        generate_and_save_images(generator, epoch, tf.random.normal([1,dataset.noise_shape]),0,output_path,'vanilla_GAN')
+    create_gif('naive_GAN_class_'+'.gif',output_path,0)
+    return history
+
+    
+def train_AC_GAN(gan, generator, discriminator, dataset):    
+    # This method returns a helper function to compute cross entropy loss
+    cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits = True)
+    """
+    The discriminator and the generator optimizers are different since we will train two networks separately.
+    The Adam optimization algorithm is an extension to stochastic gradient descent.
+    Stochastic gradient descent maintains a single learning rate (termed alpha) for all weight updates and the learning rate does not change during training.
+    A learning rate is maintained for each network weight (parameter) and separately adapted as learning unfolds.
+    """
+    generator_optimizer = tf.keras.optimizers.Adam(1e-4)
+    discriminator_optimizer = tf.keras.optimizers.Adam(1e-4)
+    #discriminator.compile(loss="categorical_crossentropy", optimizer=OPTIMIZER)
+    #discriminator.trainable = False
+    #gan.compile(loss="categorical_crossentropy", optimizer=OPTIMIZER)
+    
+    #generator, discriminator = gan.layers
+    output_path = '/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/output/AC_GAN'
+    checkpoint_dir = "/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/model_files/ACGAN"
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint = tf.train.Checkpoint(generator_optimizer = generator_optimizer,
+                                    discriminator_optimizer = discriminator_optimizer,
+                                    generator = generator,
+                                    discriminator = discriminator)
+    history = {'epoch':[], 'disc_loss_epoch':[], 'gan_loss_epoch':[]}
+    n_batch = dataset.train_generator.samples//dataset.batch_size
+    for epoch in tqdm(range(EPOCHS),desc='Epoch',position=0):
+        batches = 0  
+        batch_bar = tqdm(total=n_batch,desc='Batch ' + str(epoch+1),position=epoch+1, leave=True)
+        for X_batch, y_batch in dataset.train_generator:
+            batch_size = len(X_batch)
+            batch_bar.update(1)
+            gan_loss, disc_loss = train_step(cross_entropy, generator, discriminator, generator_optimizer, discriminator_optimizer, X_batch, y_batch ,batch_size,dataset.noise_shape)
+            batches+=1
+            if batches >= n_batch:
+                break
+        checkpoint.save(file_prefix = checkpoint_prefix)
+        batch_bar.close()
+        
+        #history['epoch'].append(epoch+1)
+        history['disc_loss_epoch'].append(disc_loss)
+        history['gan_loss_epoch'].append(gan_loss)
+        for i in range(4):
+            generate_and_save_images(generator, epoch, tf.random.normal([1,dataset.noise_shape]),i,output_path,'AC_GAN')
+    for i in range(4):
+        create_gif('AC_GAN_class_'+str(i)+'.gif',output_path,i)
     return history
 
 def main(options,train_dic):
@@ -63,14 +114,14 @@ def main(options,train_dic):
 
     dataset = Dataset(options)
     gan, generator, discriminator = create_model(options.model_name,dataset)
-    history = train_dic[options.model_name](gan,discriminator,dataset)
+    history = train_dic[options.model_name](gan,generator,discriminator,dataset)
 
     file_name = options.model_name+extent_name
     model_file = os.path.join(options.save_path,model_path+'/'+file_name+'.hd5')
     checkpoint = ModelCheckpoint(model_file, monitor='val_loss', verbose=options.verbose, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
     
-    generator, discriminator = gan.layers
+    #generator, discriminator = gan.layers
     generator.save(model_file)
 
     his_path = os.path.join(options.save_path,history_path)
@@ -87,5 +138,6 @@ if __name__ == '__main__':
         print("Can't run on GPUs now because of lacking available memory!")
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
-        train_dic = {'naive_GAN': train_naive_GAN}
+        train_dic = {'naive_GAN': train_naive_GAN, 'vanilla_GAN': train_naive_GAN, 'AC_GAN': train_AC_GAN, 
+        'DCGAN': train_AC_GAN}
         main(options,train_dic)
