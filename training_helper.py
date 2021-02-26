@@ -102,11 +102,12 @@ def plot_stats(history, path, file_name, x_label='Epochs', stats='loss'):
     plt.savefig(os.path.join(path, file_name+'_hist.png'),bbox_inches='tight')
 
 def generate_and_save_images(model, epoch, test_input,class_label,path,model_name):
+    num_examples_to_generate = 16
     # Notice `training` is set to False.
     # This is so all layers run in inference mode (batchnorm).
     predictions = None
     if model_name == 'AC_GAN':
-        predictions = model([test_input, tf.convert_to_tensor([[class_label]])], training=False)
+        predictions = model([test_input, tf.convert_to_tensor([[class_label]*num_examples_to_generate])], training=False)
     else:
         predictions = model(test_input, training=False)
 

@@ -9,6 +9,14 @@ from training_helper import *
 from model_admin import *
 from dataset_admin import *
 
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
+
+
 model_path = 'model_files'
 history_path = 'history'
 extent_name = ''
@@ -17,9 +25,14 @@ ACCEPTABLE_AVAILABLE_MEMORY = 1024
 OPTIMIZER="Adam"
 LOSS="categorical_crossentropy"
 METRICS=["accuracy"]
-EPOCHS = 200
+EPOCHS = 10
 
 def train_naive_GAN(gan, generator, discriminator, dataset, model_name):
+    num_examples_to_generate = 16
+
+    # We will reuse this seed overtime (so it's easier)
+    # to visualize progress in the animated GIF)
+    seed = tf.random.normal([num_examples_to_generate, dataset.noise_shape])
     discriminator.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
     discriminator.trainable = False
     gan.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
@@ -55,14 +68,19 @@ def train_naive_GAN(gan, generator, discriminator, dataset, model_name):
         #history['epoch'].append(epoch+1)
         history['disc_loss_epoch'].append(disc_loss['loss'])
         history['gan_loss_epoch'].append(gan_loss['loss'])
-        generate_and_save_images(generator, epoch, tf.random.normal([1,dataset.noise_shape]),0,output_path,'vanilla_GAN')
+        generate_and_save_images(generator, epoch, seed,0,output_path,'vanilla_GAN')
     create_gif('naive_GAN_class_'+'.gif',output_path,0)
     return history
 
     
 def train_AC_GAN(gan, generator, discriminator, dataset, model_name):    
+    num_examples_to_generate = 16
+
+    # We will reuse this seed overtime (so it's easier)
+    # to visualize progress in the animated GIF)
+    seed = tf.random.normal([num_examples_to_generate, dataset.noise_shape])
     # This method returns a helper function to compute cross entropy loss
-    cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits = True)
+    cross_entropy = tf.keras.losses.CategoricalCrossentropy()
     """
     The discriminator and the generator optimizers are different since we will train two networks separately.
     The Adam optimization algorithm is an extension to stochastic gradient descent.
@@ -102,7 +120,7 @@ def train_AC_GAN(gan, generator, discriminator, dataset, model_name):
         history['disc_loss_epoch'].append(disc_loss)
         history['gan_loss_epoch'].append(gan_loss)
         for i in range(4):
-            generate_and_save_images(generator, epoch, tf.random.normal([1,dataset.noise_shape]),i,output_path,'AC_GAN')
+            generate_and_save_images(generator, epoch, seed,i,output_path,'AC_GAN')
     for i in range(4):
         create_gif(model_name + '_class_'+str(i)+'.gif',output_path,i)
     return history
