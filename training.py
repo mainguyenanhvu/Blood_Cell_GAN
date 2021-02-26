@@ -19,7 +19,7 @@ LOSS="categorical_crossentropy"
 METRICS=["accuracy"]
 EPOCHS = 200
 
-def train_naive_GAN(gan, generator, discriminator, dataset):
+def train_naive_GAN(gan, generator, discriminator, dataset, model_name):
     discriminator.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
     discriminator.trainable = False
     gan.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
@@ -60,7 +60,7 @@ def train_naive_GAN(gan, generator, discriminator, dataset):
     return history
 
     
-def train_AC_GAN(gan, generator, discriminator, dataset):    
+def train_AC_GAN(gan, generator, discriminator, dataset, model_name):    
     # This method returns a helper function to compute cross entropy loss
     cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits = True)
     """
@@ -76,8 +76,8 @@ def train_AC_GAN(gan, generator, discriminator, dataset):
     #gan.compile(loss="categorical_crossentropy", optimizer=OPTIMIZER)
     
     #generator, discriminator = gan.layers
-    output_path = '/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/output/AC_GAN'
-    checkpoint_dir = "/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/model_files/ACGAN"
+    output_path = '/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/output/'+model_name
+    checkpoint_dir = "/home/anhkhoa/Vu_working/GAN/Blood_Cell/result/model_files/"+model_name
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(generator_optimizer = generator_optimizer,
                                     discriminator_optimizer = discriminator_optimizer,
@@ -104,7 +104,7 @@ def train_AC_GAN(gan, generator, discriminator, dataset):
         for i in range(4):
             generate_and_save_images(generator, epoch, tf.random.normal([1,dataset.noise_shape]),i,output_path,'AC_GAN')
     for i in range(4):
-        create_gif('AC_GAN_class_'+str(i)+'.gif',output_path,i)
+        create_gif(model_name + '_class_'+str(i)+'.gif',output_path,i)
     return history
 
 def main(options,train_dic):
@@ -114,7 +114,7 @@ def main(options,train_dic):
 
     dataset = Dataset(options)
     gan, generator, discriminator = create_model(options.model_name,dataset)
-    history = train_dic[options.model_name](gan,generator,discriminator,dataset)
+    history = train_dic[options.model_name](gan,generator,discriminator,dataset, options.model_name)
 
     file_name = options.model_name+extent_name
     model_file = os.path.join(options.save_path,model_path+'/'+file_name+'.hd5')
@@ -139,5 +139,5 @@ if __name__ == '__main__':
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
         train_dic = {'naive_GAN': train_naive_GAN, 'vanilla_GAN': train_naive_GAN, 'AC_GAN': train_AC_GAN, 
-        'DCGAN': train_AC_GAN}
+        'DC_GAN': train_AC_GAN}
         main(options,train_dic)
